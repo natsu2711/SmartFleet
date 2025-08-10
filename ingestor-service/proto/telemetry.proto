@@ -1,0 +1,38 @@
+// ingestor-service/proto/telemetry.proto
+syntax = "proto3";
+
+package telemetry;
+
+option go_package = "smartfleet/ingestor/proto";
+
+import "google/protobuf/timestamp.proto";
+
+// 定义遥测服务
+service TelemetryService {
+  // 客户端以流的形式发送遥测数据包，服务器以流的形式返回确认信息。
+  // 这种双向流模式非常适合持续的数据上报。
+  rpc StreamTelemetryData(stream TelemetryPacket) returns (stream Ack);
+}
+
+// 单个遥测数据包的结构
+message TelemetryPacket {
+  string vehicle_id = 1;                      // 车辆唯一标识
+  google.protobuf.Timestamp timestamp = 2;    // 数据上报时间戳
+  Location location = 3;                      // 地理位置
+  double speed_kmh = 4;                       // 速度 (公里/小时)
+  double fuel_level_percent = 5;              // 油量 (百分比)
+  double engine_temperature_celsius = 6;      // 引擎温度 (摄氏度)
+  string packet_id = 7;                       // 客户端生成的唯一包ID，用于Ack
+}
+
+message Location {
+  double latitude = 1;
+  double longitude = 2;
+}
+
+// 服务端确认消息
+message Ack {
+  string packet_id = 1;      // 对应收到的 TelemetryPacket 的 packet_id
+  bool received = 2;         // 确认是否成功接收
+}
+

@@ -1,0 +1,52 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # 1. PostgreSQL 数据库 + TimescaleDB 扩展
+  database:
+    image: timescale/timescaledb:latest-pg14
+    container_name: smartfleet-db
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=smartfleet
+    ports:
+      - "5432:5432" # 将容器的5432端口映射到宿主机
+    volumes:
+      - pgdata:/var/lib/postgresql/data # 数据持久化
+
+  # 2. RabbitMQ 消息队列
+  message-queue:
+    image: rabbitmq:3.9-management
+    container_name: smartfleet-rabbitmq
+    ports:
+      - "5672:5672"   # AMQP 协议端口
+      - "15672:15672" # RabbitMQ 管理界面端口
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+
+  # 3. 数据接收服务 (Go) - 稍后会添加 build context
+  ingestor-service:
+    container_name: smartfleet-ingestor
+    build: ./ingestor-service # 指定 Dockerfile 的位置
+    ports:
+      - "50051:50051" # gRPC 端口
+    depends_on:
+      - message-queue # 确保在 ingestor 启动前，消息队列已经就绪
+
+  # 4. 核心 API 服务 (Python) - 稍后会添加 build context
+  core-api-service:
+    container_name: smartfleet-core-api
+    # build: ./core-api-service
+    ports:
+      - "8000:8000" # HTTP API 端口
+    depends_on:
+      - database
+      - message-queue
+    environment:
+      - DATABASE_URL=postgresql://admin:password@database:5432/smartfleet
+      - RABBITMQ_URL=amqp://guest:guest@message-queue:5672/
+
+volumes:
+  pgdata: # 定义一个 volume 用于持久化数据库数据
